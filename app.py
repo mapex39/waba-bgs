@@ -7,23 +7,17 @@ from dotenv import load_dotenv
 # Ortam değişkenlerini yükle
 load_dotenv()
 
-# API anahtarları
+app = Flask(__name__)
+
+# API Anahtarları
 openai.api_key = os.getenv("OPENAI_API_KEY")
 fb_token = os.getenv("FB_PAGE_TOKEN")
 verify_token = os.getenv("FB_VERIFY_TOKEN")
 
-app = Flask(__name__)
-
-# Ana route kontrolü (opsiyonel)
-@app.route('/', methods=['GET'])
-def home():
-    return "Webhook çalışıyor!", 200
-
-# Webhook endpoint
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
     if request.method == 'GET':
-        # Doğrulama (Meta developer panelinde kullanılıyor)
+        # Meta doğrulama adımı
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
@@ -35,54 +29,70 @@ def webhook():
 
     elif request.method == 'POST':
         data = request.get_json()
-        print("📥 Gelen Veri:", data)
+        print("📥 Gelen veri:", data)
 
         try:
-            # Mesajı yakala
-            for entry in data.get("entry", []):
-                for change in entry.get("changes", []):
-                    value = change.get("value", {})
-                    messages = value.get("messages", [])
+            # Mesajı çıkaralım
+            entry = data['entry'][0]
+            changes = entry['changes'][0]
+            value = changes['value']
+            messages = value.get('messages')
 
-                    for message in messages:
-                        sender = message["from"]
-                        text = message["text"]["body"]
+            if messages:
+                message = messages[0]
+                phone_number = message['from']  # Gönderen numara
+                user_message = message['text']['body']  # Kullanıcı mesajı
 
-                        print(f"👤 {sender} dedi ki: {text}")
+                print(f"👤 Kullanıcı mesajı: {user_message}")
 
-                        # GPT ile yanıt üret
-                        gpt_response = openai.ChatCompletion.create(
-                            model="gpt-3.5-turbo",
-                            messages=[
-                                {"role": "system", "content": "Sen bir müşteri temsilcisisin."},
-                                {"role": "user", "content": text}
-                            ]
-                        )
+                # GPT ile cevap üret
+                gpt_reply = generate_gpt_reply(user_message)
 
-                        reply = gpt_response.choices[0].message["content"]
-                        print("🤖 GPT yanıtı:", reply)
+                print(f"🤖 GPT yanıtı: {gpt_reply}")
 
-                        # Meta mesajı gönder
-                        send_message(sender, reply)
+                # Yanıtı kullanıcıya gönder
+                send_whatsapp_message(phone_number, gpt_reply)
 
         except Exception as e:
             print("❌ Hata:", e)
 
         return "OK", 200
 
-# Mesaj gönderme fonksiyonu
-def send_message(recipient, message_text):
-    url = "https://graph.facebook.com/v18.0/me/messages"
-    headers = {"Content-Type": "application/json"}
+def generate_gpt_reply(prompt):
+    """OpenAI API ile yanıt üret"""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # veya gpt-4
+            messages=[
+                {"role": "system", "content": "Sen kibar ve bilgili bir müşteri temsilcisisin. Kısa ve net cevaplar ver."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response['choices'][0]['message']['content'].strip()
+
+    except Exception as e:
+        print("❌ GPT hatası:", e)
+        return "Size yardımcı olurken bir sorun oluştu. Lütfen daha sonra tekrar deneyin."
+
+def send_whatsapp_message(to, message):
+    """WhatsApp mesajını gönder"""
+    url = f"https://graph.facebook.com/v18.0/{os.getenv('PHONE_NUMBER_ID')}/messages"
+    headers = {
+        "Authorization": f"Bearer {fb_token}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "messaging_product": "whatsapp",
-        "to": recipient,
+        "to": to,
         "type": "text",
-        "text": {
-            "body": message_text
-        }
+        "text": {"body": message}
     }
-    params = {"access_token": fb_token}
-    response = requests.post(url, headers=headers, json=payload, params=params)
 
-    print("📤 Yanıt Gönderildi:", response.status_code, response.text)
+    try:
+        r = requests.post(url, headers=headers, json=payload)
+        print("📤 Mesaj gönderme sonucu:", r.status_code, r.text)
+    except Exception as e:
+        print("❌ Mesaj gönderme hatası:", e)
+
+if __name__ == '__main__':
+    app.run(port=5000)

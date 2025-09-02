@@ -2,7 +2,7 @@ from flask import Flask, request
 import openai
 import requests
 import os
-app = Flask(__name__)
+app = Flask(waba-bgs)
 
 VERIFY_TOKEN = "solar-whatsapp-bgs"  # 👈 Bu değeri sen belirle, aynı değeri Meta'da kullanacaksın
 from dotenv import load_dotenv

@@ -1,17 +1,28 @@
 from flask import Flask, request
-import os
+import openai
+import requests
 
 app = Flask(__name__)
 
-@app.route('/')
-def hello():
-    return "Webhook çalışıyor!"
+VERIFY_TOKEN = "solar-whatsapp-bgs"  # 👈 Bu değeri sen belirle, aynı değeri Meta'da kullanacaksın
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
-    data = request.json
-    print("Gelen veri:", data)
-    return "OK", 200
+    if request.method == 'GET':
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
 
-if __name__ == '__main__':
-    app.run(port=5000)
+        if mode == "subscribe" and token == VERIFY_TOKEN:
+            return challenge, 200
+        else:
+            return "Verification failed", 403
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        print("📥 Gelen mesaj:", data)
+
+        # Burada mesaj içeriğini al ve GPT'den yanıt al
+        # GPT cevabını WABA API ile gönder
+
+        return "OK", 200

@@ -1,11 +1,17 @@
 from flask import Flask, request
 import openai
 import requests
-
+import os
 app = Flask(__name__)
 
 VERIFY_TOKEN = "solar-whatsapp-bgs"  # 👈 Bu değeri sen belirle, aynı değeri Meta'da kullanacaksın
+from dotenv import load_dotenv
 
+load_dotenv()  # .env dosyasını yükler
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+fb_token = os.getenv("FB_PAGE_TOKEN")
+verify_token = os.getenv("FB_VERIFY_TOKEN")
 @app.route('/webhook', methods=['GET', 'POST'])
 def webhook():
     if request.method == 'GET':

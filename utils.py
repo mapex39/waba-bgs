@@ -6,7 +6,7 @@ def extract_text(message):
 
 def send_whatsapp_message(phone_number_id, recipient_phone, text):
     headers = {
-        "Authorization": f"Bearer {os.environ['WHATSAPP_TOKEN']}",
+        "Authorization": f"Bearer {os.environ['FB_PAGE_TOKEN']}",
         "Content-Type": "application/json"
     }
 
@@ -26,7 +26,7 @@ def send_whatsapp_message(phone_number_id, recipient_phone, text):
 
 def send_button_message(phone_number_id, recipient_phone, text, buttons):
     headers = {
-        "Authorization": f"Bearer {os.environ['WHATSAPP_TOKEN']}",
+        "Authorization": f"Bearer {os.environ['FB_PAGE_TOKEN']}",
         "Content-Type": "application/json"
     }
 

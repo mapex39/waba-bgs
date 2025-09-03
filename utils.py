@@ -4,6 +4,18 @@ from logger import log_message
 
 WHATSAPP_API_URL = "https://graph.facebook.com/v18.0"
 
+def extract_text(message: dict) -> str:
+    if message["type"] == "text":
+        return message["text"]["body"]
+    elif message["type"] == "button":
+        return message["button"]["text"]
+    elif message["type"] == "interactive":
+        interactive_type = message["interactive"]["type"]
+        if interactive_type == "button_reply":
+            return message["interactive"]["button_reply"]["title"]
+        elif interactive_type == "list_reply":
+            return message["interactive"]["list_reply"]["title"]
+    return ""
 # --- Yardımcı Fonksiyon: Buton başlıklarını kırpar ---
 def truncate_button_titles(buttons, max_length=20):
     for btn in buttons:

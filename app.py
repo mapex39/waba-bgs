@@ -3,59 +3,72 @@ import openai
 import requests
 import os
 from dotenv import load_dotenv
+import json
+from core.variants import generate_response
+from helpers import choose_variant
+from core.classifier import classify_message
+from core.logger import log_message, evaluate_potential, analyze_buyer_type
 
 app = Flask(__name__)
 load_dotenv()
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-PAGE_ACCESS_TOKEN = os.getenv("FB_PAGE_TOKEN")
-VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN")
+fb_token = os.getenv("FB_PAGE_TOKEN")
+verify_token = os.getenv("FB_VERIFY_TOKEN")
 
-@app.route('/webhook', methods=['GET', 'POST'])
+
+@app.route("/webhook", methods=["GET", "POST"])
 def webhook():
-    if request.method == 'GET':
+    if request.method == "GET":
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
-
-        if mode == "subscribe" and token == VERIFY_TOKEN:
+        if mode == "subscribe" and token == verify_token:
             return challenge, 200
         else:
             return "Verification failed", 403
 
-    elif request.method == 'POST':
+    elif request.method == "POST":
         data = request.get_json()
-        print("📥 Gelen mesaj:", data)
+        print("📥 Gelen mesaj:", json.dumps(data, indent=2))
 
-        # Mesaj kontrolü
         try:
-            message_text = data['entry'][0]['changes'][0]['value']['messages'][0]['text']['body']
-            sender_id = data['entry'][0]['changes'][0]['value']['messages'][0]['from']
-        except KeyError:
-            return "No message found", 200
+            message = data['entry'][0]['changes'][0]['value']['messages'][0]
+            sender_id = message['from']
+            message_text = message['text']['body']
 
-        # GPT yanıtı al
-        try:
-            completion = openai.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Sen bir satış temsilcisisin. Solar ve şehir şebekeli aydınlatma ürünleri hakkında detaylı, ama sade ve anlaşılır bilgiler veriyorsun."},
-                    {"role": "user", "content": message_text}
-                ]
-            )
-            reply = completion.choices[0].message.content
+            # Kategori belirleme
+            category = classify_message(message_text)
+
+            # Variant seçimi
+            variant = choose_variant()
+
+            # Cevap üret
+            reply = generate_response(category, variant)
+
+            # Kullanıcı tipi ve potansiyel analiz
+            buyer_type = analyze_buyer_type(message_text)
+            potential_score = evaluate_potential(message_text)
+
+            # Cevabı özelleştir
+            reply += f"\n\n(Satın alma potansiyeli: {potential_score}/5, Alıcı tipi: {buyer_type})"
+
+            # Mesaj gönder
+            send_message(sender_id, reply)
+
+            # Loglama
+            log_message(sender_id, message_text, reply, category, variant, potential_score, buyer_type)
+
         except Exception as e:
-            reply = "Üzgünüm, şu anda teknik bir sorun nedeniyle yanıt veremiyorum. Lütfen daha sonra tekrar deneyin."
-            print("❌ GPT Hatası:", e)
+            print(f"❌ Hata: {e}")
 
-        # Yanıtı gönder
-        send_message(sender_id, reply)
         return "OK", 200
 
-def send_message(recipient_id, message_text):
+
+def send_message(recipient_id, text):
     url = f"https://graph.facebook.com/v18.0/{os.getenv('PHONE_NUMBER_ID')}/messages"
     headers = {
-        "Authorization": f"Bearer {PAGE_ACCESS_TOKEN}",
+        "Authorization": f"Bearer {fb_token}",
         "Content-Type": "application/json"
     }
     payload = {
@@ -63,7 +76,7 @@ def send_message(recipient_id, message_text):
         "to": recipient_id,
         "type": "text",
         "text": {
-            "body": message_text
+            "body": text
         }
     }
 

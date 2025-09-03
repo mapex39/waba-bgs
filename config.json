@@ -1,0 +1,5 @@
+{
+  "default_variant": "A1",
+  "ab_testing_enabled": true,
+  "use_random_variant": true
+}

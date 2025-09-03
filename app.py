@@ -1,55 +1,59 @@
-# app.py
-from flask import Flask, request
-from dotenv import load_dotenv
-from variants import generate_response
-from utils import send_whatsapp_message, log_message
 import os
+from flask import Flask, request
+from utils import extract_text, send_whatsapp_message, send_button_message
+from variants import generate_response, classify_intent
 
-# Ortam değişkenlerini yükle
-load_dotenv()
-
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 app = Flask(__name__)
-
-@app.route("/webhook", methods=["GET"])
-def verify():
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
-    if token == VERIFY_TOKEN:
-        return challenge, 200
-    return "Verification token mismatch", 403
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
+    print("📥 Gelen mesaj:", data)
 
     try:
-        for entry in data.get("entry", []):
-            for change in entry.get("changes", []):
-                value = change.get("value", {})
-                messages = value.get("messages")
+        entry = data["entry"][0]
+        change = entry["changes"][0]["value"]
 
-                if messages:
-                    message = messages[0]
-                    wa_id = message["from"]
-                    text = message["text"]["body"]
+        if "messages" in change:
+            message = change["messages"][0]
+            phone_number_id = change["metadata"]["phone_number_id"]
+            from_number = message["from"]
+            message_text = extract_text(message)
 
-                    result = generate_response(text)
-                    reply = result["text"]
+            # 🔍 Kullanıcının niyeti
+            intent = classify_intent(message_text)
+            print("🎯 Kullanıcı niyeti:", intent)
 
-                    send_whatsapp_message(wa_id, reply)
+            # 💬 Eğer ilk mesajsa buton gönder
+            if message["type"] == "text" and intent == "first_contact":
+                send_button_message(
+                    phone_number_id,
+                    from_number,
+                    text="📌 Merhaba! Size nasıl yardımcı olabiliriz?",
+                    buttons=[
+                        {
+                            "type": "reply",
+                            "reply": {"id": "solar_ev", "title": "🌞 Güneş Enerjili Sistemler"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "solar_aydinlatma", "title": "💡 Solar Aydınlatma"}
+                        },
+                        {
+                            "type": "reply",
+                            "reply": {"id": "uzman_gorus", "title": "📞 Uzmanla Görüşmek"}
+                        }
+                    ]
+                )
+            else:
+                response_text = generate_response(message_text)
+                send_whatsapp_message(phone_number_id, from_number, response_text)
 
-                    log_message(
-                        user_id=wa_id,
-                        message=f"Gelen: {text} | Yanıt: {reply} | Tür: {result['category']} | Niyet: {result['intent_score']} | Kullanıcı: {result['user_type']}",
-                        status_code=200,
-                        api_response="sent"
-                    )
+        return "OK", 200
 
     except Exception as e:
-        log_message("system", f"⚠️ Hata: {str(e)}", 500, str(data))
-    
-    return "OK", 200
+        print("⚠️ Hata:", e)
+        return "error", 500
 
 if __name__ == "__main__":
     app.run(debug=True)

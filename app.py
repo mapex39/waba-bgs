@@ -25,10 +25,11 @@ def webhook():
             print("🎯 Kullanıcı niyeti:", intent)
 
             # 💬 Eğer ilk mesajsa buton gönder
+
             if message["type"] == "text" and intent == "first_contact":
                 send_message_with_buttons(
+                    phone_id,
                     recipient_phone,
-                    from_number,
                     text="📌 Merhaba! Size nasıl yardımcı olabiliriz?",
                     buttons=[
                         {

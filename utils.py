@@ -1,6 +1,6 @@
 import requests
 import json
-from logger import log
+from logger import log_message
 
 WHATSAPP_API_URL = "https://graph.facebook.com/v18.0"
 

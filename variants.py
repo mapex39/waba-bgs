@@ -3,6 +3,28 @@ import openai
 import json
 import re
 
+def classify_intent(text):
+    text = text.lower()
+    greetings = ["merhaba", "selam", "iyi günler", "günaydın", "akşamlar"]
+    if any(greet in text for greet in greetings):
+        return "first_contact"
+    return "normal_query"
+
+def generate_response(text):
+    text = text.lower()
+
+    if "bahçe" in text and "güneş" in text:
+        return "Bahçeniz için güneş enerjili aydınlatma ürünleri öneriyoruz. İsterseniz örnek görseller paylaşabiliriz."
+
+    elif "ev" in text and "sistem" in text:
+        return "Ev tipi güneş enerjili sistemlerimiz var. Evinizdeki kullanım alışkanlıklarına göre size özel sistem önerelim mi?"
+
+    elif "aydınlatma" in text:
+        return "Solar aydınlatma ürünlerimiz mevcuttur. Nerede kullanmak istediğinizi belirtirseniz yardımcı olabilirim."
+
+    else:
+        return "Sizi daha iyi anlayabilmem için neyle ilgilendiğinizi kısaca yazabilir misiniz? (Örneğin: ev, bahçe, aydınlatma, sulama)"
+
 def classify_message(message):
     message = message.lower()
 

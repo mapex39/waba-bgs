@@ -1,0 +1,22 @@
+[
+  {
+    "category": "güneş enerjili aydınlatma",
+    "keywords": ["güneş enerjili", "solar lamba", "solar aydınlatma", "bahçe lambası", "ışık", "off-grid"]
+  },
+  {
+    "category": "şebeke bağlantılı aydınlatma",
+    "keywords": ["şebeke bağlantılı", "on grid", "direk", "aydınlatma direği", "led armatür"]
+  },
+  {
+    "category": "karavan sistemleri",
+    "keywords": ["karavan", "inverter", "buzdolabı", "şarj cihazı", "akü", "panel"]
+  },
+  {
+    "category": "tarımsal sulama sistemleri",
+    "keywords": ["tarla", "kuyu", "sulama", "rf", "pompa", "kontrol", "otomasyon", "dozaj"]
+  },
+  {
+    "category": "genel bilgi & iletişim",
+    "keywords": ["adres", "nerede", "telefon", "çalışma saati", "açık mısınız", "iletişim", "mesai"]
+  }
+]

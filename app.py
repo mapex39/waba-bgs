@@ -2,98 +2,106 @@ from flask import Flask, request
 import openai
 import requests
 import os
+import logging
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv()
-
 app = Flask(__name__)
 
-# API anahtarları
-openai.api_key = os.getenv("OPENAI_API_KEY")
-fb_token = os.getenv("FB_PAGE_TOKEN")
-verify_token = os.getenv("FB_VERIFY_TOKEN")
+# 📁 Log klasörü oluştur
+os.makedirs("logs", exist_ok=True)
+log_filename = datetime.now().strftime("logs/app_%Y-%m-%d.log")
 
-# Basit skorlandırma fonksiyonu
-def estimate_purchase_intent(message_text):
-    high_intent_keywords = ["fiyat", "kurulum", "kaç para", "almak istiyorum", "teklif", "montaj", "ne kadar", "kredi kartı", "teslimat"]
-    low_intent_keywords = ["merhaba", "adres", "telefon", "açık mısınız", "neredesiniz"]
+# 📝 Logging yapılandırması
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    encoding='utf-8'
+)
 
-    score = 3  # orta seviye başla
+# ✅ Meta bilgileri (gizlilik için örnek değerler)
+ACCESS_TOKEN = "YOUR_WHATSAPP_TOKEN"
+PHONE_NUMBER_ID = "YOUR_PHONE_NUMBER_ID"
+WHATSAPP_API_URL = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
 
-    for word in high_intent_keywords:
-        if word in message_text.lower():
-            score += 1
-    for word in low_intent_keywords:
-        if word in message_text.lower():
-            score -= 1
-
-    return max(1, min(score, 5))
-
-# GPT yanıtı üret
+# 🔁 Otomatik cevap üretici (kısa örnek versiyon)
 def generate_response(message_text):
-    intent_score = estimate_purchase_intent(message_text)
+    message_text = message_text.lower()
 
-    messages = [
-        {"role": "system", "content": "Sen güneş enerjili ve şehir şebekeli aydınlatma ürünlerini anlatan bir satış temsilcisisin. Teknik terim kullanma, kullanıcıya göre konuş."},
-        {"role": "user", "content": message_text}
-    ]
+    if "ev" in message_text or "sistem" in message_text:
+        return "Ev tipi güneş enerji sistemlerimiz mevcut. Size uygun paketleri paylaşabiliriz."
+    elif "aydınlatma" in message_text or "lamba" in message_text:
+        return "Bahçeniz veya sokak için solar aydınlatmalarımız var. Kaç adet düşünüyorsunuz?"
+    elif "sulama" in message_text:
+        return "Tarla veya hobi bahçesi için solar sulama sistemlerimiz mevcut. Lokasyon bilgisini paylaşabilir misiniz?"
+    else:
+        return "İlgilendiğiniz ürünü biraz daha detaylı anlatabilir misiniz? Size en doğru çözümü sunmak isteriz."
 
-    response = openai.chat.completions.create(
-        model="gpt-4",
-        messages=messages
-    )
-    reply = response.choices[0].message.content.strip()
-
-    log_interaction(message_text, reply, intent_score)
-
-    return reply
-
-# Mesaj ve skorları logla
-def log_interaction(question, answer, score):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open("chat_log.csv", "a", encoding="utf-8") as f:
-        f.write(f'"{now}","{question}","{answer}",{score}\n')
-
-# WABA mesaj gönderme
-def send_message(recipient_id, message_text):
-    url = f"https://graph.facebook.com/v18.0/{os.getenv('PHONE_NUMBER_ID')}/messages"
-    headers = {
-        "Authorization": f"Bearer {fb_token}",
-        "Content-Type": "application/json"
-    }
+# 📤 WhatsApp mesajı gönderici
+def send_whatsapp_message(phone_number, message_text):
     data = {
         "messaging_product": "whatsapp",
-        "to": recipient_id,
+        "to": phone_number,
         "type": "text",
         "text": {"body": message_text}
     }
-    response = requests.post(url, headers=headers, json=data)
-    print("📤 Yanıt gönderildi:", response.status_code, response.text)
 
-# Webhook
-@app.route("/webhook", methods=["GET", "POST"])
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(WHATSAPP_API_URL, headers=headers, json=data)
+    logging.info(f"📤 Yanıt gönderildi: {response.status_code} {response.text}")
+    return response
+
+# 🔄 Webhook endpoint
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    if request.method == "GET":
-        mode = request.args.get("hub.mode")
-        token = request.args.get("hub.verify_token")
-        challenge = request.args.get("hub.challenge")
+    data = request.get_json()
+    logging.info(f"📥 Gelen mesaj: {data}")
 
-        if mode == "subscribe" and token == verify_token:
-            return challenge, 200
-        else:
-            return "Verification failed", 403
+    try:
+        for entry in data.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
 
-    elif request.method == "POST":
-        data = request.get_json()
-        print("📥 Gelen mesaj:", data)
+                # Kullanıcı mesajı varsa
+                if "messages" in value:
+                    message = value["messages"][0]
+                    phone = message["from"]
+                    text = message.get("text", {}).get("body", "")
 
-        try:
-            message_text = data["entry"][0]["changes"][0]["value"]["messages"][0]["text"]["body"]
-            sender_id = data["entry"][0]["changes"][0]["value"]["messages"][0]["from"]
-            reply = generate_response(message_text)
-            send_message(sender_id, reply)
-        except Exception as e:
-            print("⚠️ Hata:", e)
+                    response = generate_response(text)
+                    send_whatsapp_message(phone, response)
 
-        return "OK", 200
+                # Mesaj durumu (sent, delivered vs.)
+                elif "statuses" in value:
+                    status_info = value["statuses"][0]
+                    logging.info(f"Mesaj durumu: {status_info.get('status')} - ID: {status_info.get('id')}")
+
+                else:
+                    logging.warning(f"Bilinmeyen değişiklik tipi: {value}")
+
+    except Exception as e:
+        logging.exception(f"⚠️ Webhook işlenirken hata: {str(e)}")
+
+    return "OK", 200
+
+# 🌐 Meta doğrulama
+@app.route("/webhook", methods=["GET"])
+def verify():
+    verify_token = "TEST_TOKEN"
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+
+    if mode and token and token == verify_token:
+        return challenge, 200
+    else:
+        return "Verification failed", 403
+
+# 🚀 Başlatıcı
+if __name__ == "__main__":
+    app.run(debug=True)

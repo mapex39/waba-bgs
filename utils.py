@@ -25,7 +25,30 @@ def truncate_button_titles(buttons, max_length=20):
                 log(f"[UYARI] Buton başlığı çok uzun: '{title}' => kısaltıldı.")
                 btn["reply"]["title"] = title[:max_length]
     return buttons
+def send_whatsapp_message(phone_id, access_token, recipient_phone, text):
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
 
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_phone,
+        "type": "text",
+        "text": {
+            "body": text
+        }
+    }
+
+    url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        log(f"📤 Metin mesajı gönderildi: {response.status_code} {response.text}")
+        return response.json()
+    except Exception as e:
+        log(f"[HATA] Metin mesaj gönderimi başarısız: {str(e)}")
+        return None
 # --- WhatsApp Mesaj Gönderici ---
 def send_message_with_buttons(phone_id, access_token, recipient_phone, text, buttons):
     headers = {

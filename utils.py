@@ -1,49 +1,29 @@
-import os
 import requests
+import json
+from logger import log
+
+WHATSAPP_API_URL = "https://graph.facebook.com/v18.0"
+
+# --- Yardımcı Fonksiyon: Buton başlıklarını kırpar ---
 def truncate_button_titles(buttons, max_length=20):
     for btn in buttons:
         if "reply" in btn and "title" in btn["reply"]:
             title = btn["reply"]["title"]
             if len(title) > max_length:
+                log(f"[UYARI] Buton başlığı çok uzun: '{title}' => kısaltıldı.")
                 btn["reply"]["title"] = title[:max_length]
     return buttons
 
-# sonra:
-buttons = truncate_button_titles(buttons)
-def extract_text(message):
-    return message.get("text", {}).get("body", "").strip()
-
-def send_whatsapp_message(phone_number_id, recipient_phone, text):
+# --- WhatsApp Mesaj Gönderici ---
+def send_message_with_buttons(phone_id, access_token, recipient_phone, text, buttons):
     headers = {
-        "Authorization": f"Bearer {os.environ['FB_PAGE_TOKEN']}",
+        "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": recipient_phone,
-        "type": "text",
-        "text": {"body": text}
-    }
+    # Önce buton başlıklarını kontrol edip kesiyoruz
+    buttons = truncate_button_titles(buttons)
 
-    response = requests.post(
-        f"https://graph.facebook.com/v18.0/{phone_number_id}/messages",
-        headers=headers,
-        json=payload
-    )
-    print("📤 Yanıt gönderildi:", response.status_code, response.text)
-
-def send_button_message(phone_number_id, recipient_phone, text, buttons):
-    headers = {
-        "Authorization": f"Bearer {os.environ['FB_PAGE_TOKEN']}",
-        "Content-Type": "application/json"
-    }
-MAX_TITLE_LENGTH = 20
-
-for btn in buttons:
-    title = btn.get("reply", {}).get("title", "")
-    if len(title) > MAX_TITLE_LENGTH:
-        btn["reply"]["title"] = title[:MAX_TITLE_LENGTH]
     payload = {
         "messaging_product": "whatsapp",
         "to": recipient_phone,
@@ -59,9 +39,12 @@ for btn in buttons:
         }
     }
 
-    response = requests.post(
-        f"https://graph.facebook.com/v18.0/{phone_number_id}/messages",
-        headers=headers,
-        json=payload
-    )
-    print("📤 Butonlu mesaj gönderildi:", response.status_code, response.text)
+    url = f"{WHATSAPP_API_URL}/{phone_id}/messages"
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        log(f"📤 Butonlu mesaj gönderildi: {response.status_code} {response.text}")
+        return response.json()
+    except Exception as e:
+        log(f"[HATA] Mesaj gönderimi başarısız: {str(e)}")
+        return None

@@ -1,41 +1,53 @@
-# utils.py
-import requests
-import json
 import os
-from datetime import datetime
+import requests
 
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-LOG_FILE = "chat_logs.txt"
+def extract_text(message):
+    return message.get("text", {}).get("body", "").strip()
 
-def send_whatsapp_message(to, message):
-    url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+def send_whatsapp_message(phone_number_id, recipient_phone, text):
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {os.environ['WHATSAPP_TOKEN']}",
         "Content-Type": "application/json"
     }
+
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        "to": recipient_phone,
         "type": "text",
-        "text": {
-            "body": message
+        "text": {"body": text}
+    }
+
+    response = requests.post(
+        f"https://graph.facebook.com/v18.0/{phone_number_id}/messages",
+        headers=headers,
+        json=payload
+    )
+    print("📤 Yanıt gönderildi:", response.status_code, response.text)
+
+def send_button_message(phone_number_id, recipient_phone, text, buttons):
+    headers = {
+        "Authorization": f"Bearer {os.environ['WHATSAPP_TOKEN']}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient_phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {
+                "text": text
+            },
+            "action": {
+                "buttons": buttons
+            }
         }
     }
 
-    response = requests.post(url, headers=headers, json=payload)
-    log_message(to, message, response.status_code, response.text)
-    return response
-
-def log_message(user_id, message, status_code, api_response):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    entry = {
-        "timestamp": timestamp,
-        "user_id": user_id,
-        "message": message,
-        "status_code": status_code,
-        "api_response": api_response
-    }
-
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    response = requests.post(
+        f"https://graph.facebook.com/v18.0/{phone_number_id}/messages",
+        headers=headers,
+        json=payload
+    )
+    print("📤 Butonlu mesaj gönderildi:", response.status_code, response.text)

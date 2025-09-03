@@ -1,45 +1,76 @@
-# core/variants.py
+# variants.py
+import openai
+import json
+import re
 
-def generate_response(category, variant="A1"):
-    """
-    Kategoriye göre, farklı stillerde yanıt verir.
-    """
+def classify_message(message):
+    message = message.lower()
+
+    if any(word in message for word in ["güneş", "solar", "panel", "enerji", "off grid", "şebekesiz"]):
+        return "solar_system"
+
+    if any(word in message for word in ["lamba", "aydınlatma", "led", "direk", "sokak lambası"]):
+        return "lighting"
+
+    if any(word in message for word in ["adres", "nerede", "konum", "gelmek istiyorum"]):
+        return "address"
+
+    if any(word in message for word in ["telefon", "aradım", "ulaşamadım", "numara"]):
+        return "contact"
+
+    if any(word in message for word in ["açık", "kaçta kapanıyor", "mesai", "çalışma saati"]):
+        return "opening_hours"
+
+    if any(word in message for word in ["fiyat", "ne kadar", "ücret", "kaç tl"]):
+        return "pricing"
+
+    return "general"
+
+def estimate_purchase_intent(message):
+    score = 1
+    message_lower = message.lower()
+
+    if any(word in message_lower for word in ["kaç", "fiyat", "ücret", "stok", "var mı", "hazır mı"]):
+        score += 1
+
+    if any(word in message_lower for word in ["hemen", "bugün", "şimdi", "acele", "acil", "sipariş", "kurulum"]):
+        score += 2
+
+    if "adres" in message_lower or "konum" in message_lower:
+        score += 1
+
+    return min(score, 5)
+
+def detect_user_type(message):
+    msg = message.lower()
+    if any(word in msg for word in ["çok pahalı", "daha ucuz", "indirim", "taksit", "peşin"]):
+        return "fiyat_odakli"
+    if any(word in msg for word in ["emin değilim", "bilmiyorum", "yardım eder misiniz"]):
+        return "çekingen"
+    if any(word in msg for word in ["şunu istiyorum", "şunu gönderin", "bu lazım"]):
+        return "kararlı"
+    return "genel"
+
+def generate_response(message, user_type="genel"):
+    category = classify_message(message)
+    intent_score = estimate_purchase_intent(message)
+    user_type = detect_user_type(message)
+
     responses = {
-        "solar_offgrid": {
-            "A1": "Güneş enerjili sistemlerimizle elektrik olmayan alanlarda aydınlatma ve enerji sağlayabilirsiniz. Nerede kullanmayı düşünüyorsunuz?",
-            "A2": "Merhaba! Elektrik olmayan yerler için güneş enerjili çözümler sunuyoruz. Ne tür cihazları çalıştırmak istiyorsunuz?",
-            "A3": "Selamlar! Güneş enerjili sistemlerimiz, özellikle bahçeler ve karavanlar için ideal. Kurulum yeri ve cihaz bilgisi verir misiniz?"
-        },
-        "solar_ongrid": {
-            "A1": "Şebeke bağlantılı sistemlerimiz sayesinde elektrik faturanızı azaltabilirsiniz. Eviniz nerede?",
-            "A2": "Merhaba! Güneş panellerimizle şebeke elektriğini destekleyebilirsiniz. Çatı alanınız uygun mu?",
-            "A3": "Selamlar! Şebeke destekli sistem kurmak istiyorsanız evinizin çatı bilgilerini alabilir miyiz?"
-        },
-        "lighting_grid": {
-            "A1": "Şehir elektriğiyle çalışan aydınlatma direkleri için size katalog gönderebilirim. Nerede kullanacaksınız?",
-            "A2": "Merhaba! Şebeke elektriğiyle çalışan LED direklerimiz mevcuttur. Projeniz için kaç adet gerekiyor?",
-            "A3": "Selamlar! Aydınlatma ihtiyacınıza göre uygun direk tipini birlikte seçebiliriz. Açık alan mı, sokak mı?"
-        },
-        "lighting_solar": {
-            "A1": "Güneş enerjili aydınlatma direkleri, elektrik olmayan bölgeler için idealdir. Alan neresi?",
-            "A2": "Merhaba! Solar aydınlatma sistemleri stoklarımızda mevcut. Ne büyüklükte bir alan aydınlatılacak?",
-            "A3": "Selamlar! Solar direkler gece boyunca aydınlatma sağlar. Proje detaylarını iletir misiniz?"
-        },
-        "agriculture_irrigation": {
-            "A1": "Tarımsal sulama sistemlerimizde güneş panelli çözümlerle kuyudan su çekebilirsiniz. Araziniz nerede?",
-            "A2": "Merhaba! Tarla sulamak için RF kontrollü sistemler kuruyoruz. Kuyu ile mesafe nedir?",
-            "A3": "Selamlar! Güneş enerjili sulama sistemlerimiz kuruluma hazır. Alan büyüklüğü ve pompa tipi önemli."
-        },
-        "general_info": {
-            "A1": "Elbette! Size yardımcı olabilmem için neyle ilgilendiğinizi öğrenebilir miyim?",
-            "A2": "Merhaba! Solar sistemler, aydınlatma ürünleri ve sulama çözümleri sunuyoruz. Hangi konuda destek istersiniz?",
-            "A3": "Selamlar! Size en iyi çözümü sunmak için neye ihtiyacınız olduğunu öğrenmem yeterli."
-        },
-        "contact_info": {
-            "A1": "İletişim bilgilerimiz: 📞 0 (312) 123 45 67 – 📍 Ostim/ANKARA. Hafta içi 09:00–18:00 arası açığız.",
-            "A2": "Bize ulaşmak isterseniz 0312 123 45 67 numaralı hattımızı arayabilirsiniz. Mağazamız Ostim'de.",
-            "A3": "Adres: Ostim OSB. Telefon: 0312 123 45 67. Hafta içi her gün buradayız, bekleriz!"
-        }
+        "solar_system": "Bahçeniz veya eviniz için güneş enerjili sistemlerimiz mevcut. Kullanım amacınızı paylaşırsanız size uygun olanı birlikte seçebiliriz.",
+        "lighting": "LED aydınlatmalar ve güneş enerjili lambalar stoklarımızda mevcut. Kullanım alanınızı paylaşırsanız örnek gönderebilirim.",
+        "address": "Mağazamız OSTİM OSB'de. Konum linki isterseniz hemen paylaşabilirim.",
+        "contact": "Bize bu numaradan ulaşabilirsiniz: 0312 340 4040",
+        "opening_hours": "Hafta içi 09:00 - 18:00 arası açığız. Cumartesi 13:00’e kadar hizmet veriyoruz.",
+        "pricing": "Fiyatlar ürün modeline göre değişiyor. Hangi ürünle ilgilendiğinizi söylerseniz detaylı bilgi verebilirim.",
+        "general": "Size nasıl yardımcı olabilirim? Güneş enerjili sistemler, aydınlatma ve diğer ürünlerimiz hakkında bilgi verebilirim."
     }
 
-    return responses.get(category, {}).get(variant, "Size yardımcı olabilmem için biraz daha detay verebilir misiniz?")
+    reply_text = responses.get(category, responses["general"])
+
+    return {
+        "text": reply_text,
+        "category": category,
+        "intent_score": intent_score,
+        "user_type": user_type
+    }

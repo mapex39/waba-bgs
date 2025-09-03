@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request
-from utils import extract_text, send_whatsapp_message, send_button_message
+from utils import extract_text, send_whatsapp_message, send_message_with_buttons
 from variants import generate_response, classify_intent
 
 app = Flask(__name__)
@@ -26,7 +26,7 @@ def webhook():
 
             # 💬 Eğer ilk mesajsa buton gönder
             if message["type"] == "text" and intent == "first_contact":
-                send_button_message(
+                send_message_with_buttons(
                     phone_number_id,
                     from_number,
                     text="📌 Merhaba! Size nasıl yardımcı olabiliriz?",

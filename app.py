@@ -55,6 +55,55 @@ def webhook():
     except Exception as e:
         print("⚠️ Hata:", e)
         return "error", 500
+@app.route('/meta-webhook', methods=['GET', 'POST'])
+def meta_webhook():
+    if request.method == 'GET':
+        # Facebook Webhook doğrulama isteği
+        if request.args.get("hub.verify_token") == os.getenv("META_VERIFY_TOKEN"):
+            return request.args.get("hub.challenge")
+        return "Doğrulama başarısız", 403
 
+    elif request.method == 'POST':
+        # Facebook tarafından gönderilen yeni lead verisi
+        data = request.get_json()
+        log(f"📥 Yeni lead verisi geldi: {json.dumps(data)}")
+
+        try:
+            entry = data['entry'][0]
+            changes = entry['changes'][0]
+            lead_id = changes['value']['leadgen_id']
+        except Exception as e:
+            log(f"[HATA] Lead ID çıkarılamadı: {str(e)}")
+            return "Hatalı format", 400
+
+        try:
+            # Meta Graph API ile lead bilgilerini çek
+            graph_token = os.getenv("META_GRAPH_ACCESS_TOKEN")
+            lead_info = requests.get(
+                f"https://graph.facebook.com/v18.0/{lead_id}?access_token={graph_token}"
+            ).json()
+
+            phone_number = extract_phone_number(lead_info)
+
+            if phone_number:
+                intro_message = (
+                    "Merhaba! ☀️ Güneş enerjili sisteminizi doğru hesaplayabilmemiz için\n"
+                    "**elektrikle hangi cihazların çalışacağını** ve\n"
+                    "**kurulum yapılacak şehri** bilmemiz gerekiyor.\n\n"
+                    "Lütfen bu bilgileri eksiksiz şekilde bizimle paylaşır mısınız?"
+                )
+
+                send_whatsapp_message(
+                    phone_id=os.getenv("PHONE_ID"),
+                    access_token=os.getenv("ACCESS_TOKEN"),
+                    recipient_phone=phone_number,
+                    text=intro_message
+                )
+
+        except Exception as e:
+            log(f"[HATA] Lead verisi işlenemedi: {str(e)}")
+            return "Hata", 500
+
+        return "OK", 200
 if __name__ == "__main__":
     app.run(debug=True)

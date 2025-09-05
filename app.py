@@ -7,7 +7,6 @@ from variants import generate_response, classify_intent
 
 app = Flask(__name__)
 
-# ✅ WhatsApp mesajları buradan alınır
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
@@ -29,6 +28,7 @@ def webhook():
 
             access_token = os.getenv("ACCESS_TOKEN")
 
+            # 💬 Eğer ilk mesajsa buton gönder
             if message["type"] == "text" and intent == "first_contact":
                 send_message_with_buttons(
                     phone_id=phone_number_id,
@@ -65,16 +65,8 @@ def webhook():
         print("⚠️ Hata:", e)
         return "error", 500
 
-# ✅ Meta Webhook doğrulama (GET)
-@app.route("/meta-webhook", methods=["GET"])
-def verify_meta_webhook():
-    verify_token = os.getenv("META_VERIFY_TOKEN")
-    if request.args.get("hub.verify_token") == verify_token:
-        return request.args.get("hub.challenge")
-    return "Doğrulama başarısız", 403
 
-# ✅ Meta Lead Ads webhook tetikleyici (POST)
-@app.route("/meta-webhook", methods=["POST"])
+@app.route('/meta-webhook', methods=['POST'])
 def meta_webhook():
     data = request.get_json()
     print("📥 Yeni lead verisi geldi:", data)
@@ -88,6 +80,7 @@ def meta_webhook():
         return "Hatalı format", 400
 
     try:
+        # Meta Graph API ile lead bilgilerini çek
         graph_token = os.getenv("META_GRAPH_ACCESS_TOKEN")
         lead_info = requests.get(
             f"https://graph.facebook.com/v18.0/{lead_id}?access_token={graph_token}"
@@ -124,3 +117,10 @@ def meta_webhook():
         return "Hata", 500
 
     return "OK", 200
+
+
+@app.route('/meta-webhook', methods=['GET'])
+def meta_webhook_verify():
+    if request.args.get("hub.verify_token") == os.getenv("META_VERIFY_TOKEN"):
+        return request.args.get("hub.challenge")
+    return "Doğrulama başarısız", 403

@@ -2,15 +2,17 @@ import os
 import json
 import requests
 from flask import Flask, request
+
 from utils import extract_text, send_whatsapp_message, send_message_with_buttons
 from variants import generate_response, classify_intent
+from logger import log_message as log
 
 app = Flask(__name__)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
-    print("📥 Gelen mesaj:", data)
+    log("📥 Gelen mesaj:", data)
 
     try:
         entry = data["entry"][0]
@@ -22,13 +24,12 @@ def webhook():
             from_number = message["from"]
             message_text = extract_text(message)
 
-            # 🔍 Kullanıcının niyeti
+            # 🎯 Kullanıcının niyeti
             intent = classify_intent(message_text)
-            print("🎯 Kullanıcı niyeti:", intent)
+            log(f"🎯 Kullanıcı niyeti: {intent}")
 
             access_token = os.getenv("ACCESS_TOKEN")
 
-            # 💬 Eğer ilk mesajsa buton gönder
             if message["type"] == "text" and intent == "first_contact":
                 send_message_with_buttons(
                     phone_id=phone_number_id,
@@ -62,25 +63,24 @@ def webhook():
         return "OK", 200
 
     except Exception as e:
-        print("⚠️ Hata:", e)
+        log(f"⚠️ Hata: {str(e)}")
         return "error", 500
 
 
 @app.route('/meta-webhook', methods=['POST'])
 def meta_webhook():
     data = request.get_json()
-    print("📥 Yeni lead verisi geldi:", data)
+    log("📥 Yeni lead verisi geldi:", data)
 
     try:
         entry = data['entry'][0]
         changes = entry['changes'][0]
         lead_id = changes['value']['leadgen_id']
     except Exception as e:
-        print(f"[HATA] Lead ID çıkarılamadı: {str(e)}")
+        log(f"[HATA] Lead ID çıkarılamadı: {str(e)}")
         return "Hatalı format", 400
 
     try:
-        # Meta Graph API ile lead bilgilerini çek
         graph_token = os.getenv("META_GRAPH_ACCESS_TOKEN")
         lead_info = requests.get(
             f"https://graph.facebook.com/v18.0/{lead_id}?access_token={graph_token}"
@@ -113,7 +113,7 @@ def meta_webhook():
             )
 
     except Exception as e:
-        print(f"[HATA] Lead verisi işlenemedi: {str(e)}")
+        log(f"[HATA] Lead verisi işlenemedi: {str(e)}")
         return "Hata", 500
 
     return "OK", 200

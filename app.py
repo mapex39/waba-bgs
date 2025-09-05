@@ -12,7 +12,7 @@ app = Flask(__name__)
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
-    log("📥 Gelen mesaj:", data)
+    print("📥 Gelen mesaj:", json.dumps(data, ensure_ascii=False, indent=2))
 
     try:
         entry = data["entry"][0]

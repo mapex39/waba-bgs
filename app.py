@@ -27,10 +27,13 @@ def webhook():
             intent = classify_intent(message_text)
             print("🎯 Kullanıcı niyeti:", intent)
 
+            access_token = os.getenv("ACCESS_TOKEN")
+
             if message["type"] == "text" and intent == "first_contact":
                 send_message_with_buttons(
-                    phone_number_id,
-                    from_number,
+                    phone_id=phone_number_id,
+                    access_token=access_token,
+                    recipient_phone=from_number,
                     text="📌 Merhaba! Size nasıl yardımcı olabiliriz?",
                     buttons=[
                         {
@@ -49,7 +52,12 @@ def webhook():
                 )
             else:
                 response_text = generate_response(message_text)
-                send_whatsapp_message(phone_number_id, from_number, response_text)
+                send_whatsapp_message(
+                    phone_id=phone_number_id,
+                    access_token=access_token,
+                    recipient_phone=from_number,
+                    text=response_text
+                )
 
         return "OK", 200
 

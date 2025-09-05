@@ -105,5 +105,4 @@ def meta_webhook():
             return "Hata", 500
 
         return "OK", 200
-if __name__ == "__main__":
-    app.run(debug=True)
+

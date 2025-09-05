@@ -48,6 +48,8 @@ def webhook():
                 )
             else:
                 response_text = generate_response(message_text)
+                phone_id = os.getenv("PHONE_ID")
+access_token = os.getenv("ACCESS_TOKEN")
                 send_whatsapp_message(phone_number_id, from_number, response_text)
 
         return "OK", 200

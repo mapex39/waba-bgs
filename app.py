@@ -25,7 +25,8 @@ def webhook():
             print("🎯 Kullanıcı niyeti:", intent)
 
             # 💬 Eğer ilk mesajsa buton gönder
-
+phone_id = os.getenv("PHONE_ID")
+access_token = os.getenv("ACCESS_TOKEN")
             if message["type"] == "text" and intent == "first_contact":
                 send_message_with_buttons(
                     phone_id,
@@ -94,7 +95,8 @@ def meta_webhook():
                     "**kurulum yapılacak şehri** bilmemiz gerekiyor.\n\n"
                     "Lütfen bu bilgileri eksiksiz şekilde bizimle paylaşır mısınız?"
                 )
-
+phone_id = os.getenv("PHONE_ID")
+access_token = os.getenv("ACCESS_TOKEN")
                 send_whatsapp_message(
                     phone_id=os.getenv("PHONE_ID"),
                     access_token=os.getenv("ACCESS_TOKEN"),
